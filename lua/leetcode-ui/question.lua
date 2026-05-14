@@ -70,24 +70,37 @@ function Question:path()
     local lang = utils.get_lang(self.lang)
     local alt = lang.alt and ("." .. lang.alt) or ""
 
-    -- handle legacy file names first
-    local fn_legacy = --
-        ("%s.%s-%s.%s"):format(self.q.frontend_id, self.q.title_slug, lang.slug, lang.ft)
-    self.file = config.storage.home:joinpath(fn_legacy)
+    local title_slug = self.q.title_slug
+    local ext = lang.ft
+
+    -- [DESIGN]: {frontend_id}_{title_slug}/Solution[{.alt}].{ext}
+    local dir = config.storage.home:joinpath(("%s.%s"):format(self.q.frontend_id, title_slug))
+    local fn = ("Solution%s.%s"):format(alt, ext)
+    self.file = dir:joinpath(fn)
 
     if self.file:exists() then
         return self.file:absolute(), true
     end
 
-    local fn = ("%s.%s%s.%s"):format(self.q.frontend_id, self.q.title_slug, alt, lang.ft)
-    self.file = config.storage.home:joinpath(fn)
-    local existed = self.file:exists()
-
-    if not existed then
-        self.file:write(self:snippet(), "w")
+    -- fallback: legacy flat format with lang_slug
+    local legacy_fn = ("%s.%s-%s.%s"):format(self.q.frontend_id, title_slug, lang.slug, ext)
+    self.file = config.storage.home:joinpath(legacy_fn)
+    if self.file:exists() then
+        return self.file:absolute(), true
     end
 
-    return self.file:absolute(), existed
+    -- fallback: legacy flat format without lang_slug
+    local legacy_fn2 = ("%s.%s%s.%s"):format(self.q.frontend_id, title_slug, alt, ext)
+    self.file = config.storage.home:joinpath(legacy_fn2)
+    if self.file:exists() then
+        return self.file:absolute(), true
+    end
+
+    dir:mkdir()
+    self.file = dir:joinpath(fn)
+    self.file:write(self:snippet(), "w")
+
+    return self.file:absolute(), false
 end
 
 function Question:create_buffer()
